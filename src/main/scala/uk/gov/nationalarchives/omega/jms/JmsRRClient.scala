@@ -5,8 +5,6 @@ import cats.effect.kernel.Sync
 import cats.effect.{Async, Resource}
 import jms4s.JmsAcknowledgerConsumer.AckAction
 import jms4s.{JmsClient, JmsProducer}
-import jms4s.activemq.activeMQ
-import jms4s.activemq.activeMQ.{ClientId, Config, Endpoint, Password, Username}
 import jms4s.config.QueueName
 import jms4s.jms.{JmsMessage, MessageFactory}
 import org.typelevel.log4cats.Logger
@@ -16,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.DurationInt
 import JmsRRClient.ReplyMessageHandler
 import cats.effect.implicits.genSpawnOps
+import jms4s.sqs.simpleQueueService
+import jms4s.sqs.simpleQueueService.{ClientId, Config, Credentials, DirectAddress, Endpoint, HTTP}
 
 case class RequestMessage(body: String)
 case class ReplyMessage(body: String)
@@ -68,11 +68,11 @@ object JmsRRClient {
     val clientIdRes: Resource[F, String] = Resource.liftK[F](customClientId.getOrElse(RandomClientIdGen.randomClientId[F]))
 
     val jmsClientRes: Resource[F, JmsClient[F]] = clientIdRes.flatMap { clientId =>
-        activeMQ.makeJmsClient[F](Config(
-              endpoints = NonEmptyList.one(Endpoint(endpoint.host, endpoint.port)),
-              username = Some(Username(credentials.username)),
-              password = Some(Password(credentials.password)),
-              clientId = ClientId(clientId)
+      simpleQueueService.makeJmsClient[F](Config(
+              endpoint = Endpoint(Some(DirectAddress(HTTP,"localhost",Some(9324))),"elasticmq"),
+              credentials = Some(Credentials("x","x")),
+              clientId = ClientId(clientId),
+              None
         ))
       }
 
@@ -111,13 +111,13 @@ object JmsRRClient {
   private def jmsConsumerHandler[F[_]: Async: Logger](requestMap: ConcurrentHashMap[String, ReplyMessageHandler[F]])(jmsMessage: JmsMessage, mf: MessageFactory[F])(implicit F: Async[F], L: Logger[F]): F[AckAction[F]] = {
     val maybeCorrelatedRequestHandler: F[Option[ReplyMessageHandler[F]]] = F.delay(jmsMessage.getJMSCorrelationId.flatMap(correlationId => Option(requestMap.remove(correlationId))))
 
-    val maybeHandled: F[Unit] = F.flatMap(maybeCorrelatedRequestHandler) { _ match {
+    val maybeHandled: F[Unit] = F.flatMap(maybeCorrelatedRequestHandler) {
       case Some(correlatedRequestHandler) =>
         correlatedRequestHandler(ReplyMessage(jmsMessage.attemptAsText.get))
       case None =>
         L.error("No request found for response '${jmsMessage.attemptAsText.get}'")
-        // TODO(AR) maybe record/report these somewhere better...
-    }}
+      // TODO(AR) maybe record/report these somewhere better...
+    }
 
     F.*>(maybeHandled)(F.pure(AckAction.ack[F]))  // acknowledge receipt of the message
   }

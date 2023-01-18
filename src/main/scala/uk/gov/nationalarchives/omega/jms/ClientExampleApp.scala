@@ -21,8 +21,10 @@ object ClientExampleApp {
     val logging = Slf4jFactory[IO]
     implicit val logger = logging.getLogger
 
-    val requestQueue = "request_general"
-    val replyQueue = "omega_editorial_web_application_instance_1"
+    //val requestQueue = "request_general"
+    val requestQueue = "DEV_QUEUE_1"
+    //val replyQueue = "omega_editorial_web_application_instance_1"
+    val replyQueue = "DEV_QUEUE_2"
 
     // 1) create a Jms Request-Reply Client (e.g. from the Play Application start up method)
     val clientRes: Resource[IO, JmsRRClient[IO]] = JmsRRClient.createForActiveMq[IO](

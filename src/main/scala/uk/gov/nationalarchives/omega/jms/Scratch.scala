@@ -1,11 +1,12 @@
 package uk.gov.nationalarchives.omega.jms
 
-import cats.data.NonEmptyList
 import cats.effect.{IO, Resource}
 import jms4s.JmsAcknowledgerConsumer.AckAction
+import jms4s.sqs.simpleQueueService
+import jms4s.sqs.simpleQueueService._
 import jms4s.{JmsAcknowledgerConsumer, JmsClient, JmsProducer}
-import jms4s.activemq.activeMQ
-import jms4s.activemq.activeMQ.{ClientId, Config, Endpoint, Password, Username}
+//import jms4s.activemq.activeMQ
+//import jms4s.activemq.activeMQ.{ClientId, Config, Endpoint, Password, Username}
 import jms4s.config.QueueName
 import jms4s.jms.JmsMessage.JmsTextMessage
 import org.typelevel.log4cats.slf4j.Slf4jFactory
@@ -41,12 +42,12 @@ object Scratch {
       IO.pure(new ConcurrentHashMap(16, 0.75f, producerConcurrencyLevel))
 
 
-    val jmsClient: Resource[IO, JmsClient[IO]] = activeMQ.makeJmsClient[IO](
+    val jmsClient: Resource[IO, JmsClient[IO]] = simpleQueueService.makeJmsClient[IO](
       Config(
-        endpoints = NonEmptyList.one(Endpoint("localhost", 61616)),
-        username = Some(Username("admin")),
-        password = Some(Password("passw0rd")),  // TODO(AR) change this
-        clientId = ClientId(clientId)
+        endpoint = Endpoint(Some(DirectAddress(HTTP,"localhost",Some(9324))),"elasticmq"),
+        credentials = Some(Credentials("x","x")),
+        clientId = ClientId(clientId),
+        None
       )
     )
 

@@ -1,12 +1,12 @@
 package uk.gov.nationalarchives.omega.jms
 
-import cats.data.NonEmptyList
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import jms4s.JmsAcknowledgerConsumer.AckAction
 import jms4s.JmsClient
-import jms4s.activemq.activeMQ
-import jms4s.activemq.activeMQ.{ClientId, Config, Endpoint, Password, Username}
 import jms4s.config.QueueName
+import jms4s.sqs.simpleQueueService
+import jms4s.sqs.simpleQueueService._
+import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import scala.concurrent.duration.DurationInt
@@ -25,20 +25,23 @@ import scala.concurrent.duration.DurationInt
  */
 object EchoServer extends IOApp {
 
-  val logging = Slf4jFactory[IO]
-  implicit val logger = logging.getLogger
+  private val logging = Slf4jFactory[IO]
+  private implicit val logger: SelfAwareStructuredLogger[IO] = logging.getLogger
 
-  val clientId = "echo_server_1"
-  val requestQueue = QueueName("request_general")
-  val responseQueue = QueueName("omega_editorial_web_application_instance_1")  //TODO(AR) note this is for the editorial web application
-  val consumerConcurrencyLevel = 10
+  private val clientId = "echo_server_1"
+  //private val requestQueue = QueueName("request_general")
+  private val requestQueue = QueueName("DEV_QUEUE_1")
 
-  val jmsClient: Resource[IO, JmsClient[IO]] = activeMQ.makeJmsClient[IO](
+  //private val responseQueue = QueueName("omega_editorial_web_application_instance_1")  //TODO(AR) note this is for the editorial web application
+  private val responseQueue = QueueName("DEV_QUEUE_2")
+  private val consumerConcurrencyLevel = 10
+
+  val jmsClient: Resource[IO, JmsClient[IO]] = simpleQueueService.makeJmsClient[IO](
     Config(
-      endpoints = NonEmptyList.one(Endpoint("localhost", 61616)),
-      username = Some(Username("admin")),
-      password = Some(Password("passw0rd")), // TODO(AR) change this
-      clientId = ClientId(clientId)
+      endpoint = Endpoint(Some(DirectAddress(HTTP, "localhost", Some(9324))),"elasticmq"),
+      credentials = Some(Credentials("x","x")),
+      clientId = ClientId(clientId),
+      None
     )
   )
 
