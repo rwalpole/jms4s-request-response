@@ -1,21 +1,23 @@
 package uk.gov.nationalarchives.omega.jms
 
 import cats.data.NonEmptyList
+import cats.effect.implicits.genSpawnOps
 import cats.effect.kernel.Sync
 import cats.effect.{Async, Resource}
 import jms4s.JmsAcknowledgerConsumer.AckAction
-import jms4s.{JmsClient, JmsProducer}
+import jms4s.activemq.activeMQ
+import jms4s.activemq.activeMQ.{Password, Username}
 import jms4s.config.QueueName
 import jms4s.jms.{JmsMessage, MessageFactory}
+import jms4s.sqs.simpleQueueService
+import jms4s.sqs.simpleQueueService.{Credentials, DirectAddress, HTTP}
+import jms4s.{JmsClient, JmsProducer}
 import org.typelevel.log4cats.Logger
+import uk.gov.nationalarchives.omega.jms.JmsRRClient.ReplyMessageHandler
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.DurationInt
-import JmsRRClient.ReplyMessageHandler
-import cats.effect.implicits.genSpawnOps
-import jms4s.sqs.simpleQueueService
-import jms4s.sqs.simpleQueueService.{ClientId, Config, Credentials, DirectAddress, Endpoint, HTTP}
 
 case class RequestMessage(body: String)
 case class ReplyMessage(body: String)
@@ -68,10 +70,35 @@ object JmsRRClient {
     val clientIdRes: Resource[F, String] = Resource.liftK[F](customClientId.getOrElse(RandomClientIdGen.randomClientId[F]))
 
     val jmsClientRes: Resource[F, JmsClient[F]] = clientIdRes.flatMap { clientId =>
-      simpleQueueService.makeJmsClient[F](Config(
-              endpoint = Endpoint(Some(DirectAddress(HTTP,"localhost",Some(9324))),"elasticmq"),
-              credentials = Some(Credentials("x","x")),
-              clientId = ClientId(clientId),
+      activeMQ.makeJmsClient[F](activeMQ.Config(
+        endpoints = NonEmptyList.one(activeMQ.Endpoint(endpoint.host, endpoint.port)),
+        username = Some(Username(credentials.username)),
+        password = Some(Password(credentials.password)),
+        clientId = activeMQ.ClientId(clientId)
+      ))
+    }
+
+    create[F](jmsClientRes)(replyQueue)
+  }
+
+  /**
+   * Create a JMS Request-Reply Client for use with Amazon Simple Queue Service.
+   *
+   * @param credentials the credentials for connecting to the ActiveMQ broker.
+   * @param customClientId an optional Custom client ID to identify this client.
+   *
+   * @param replyQueue the queue that replies should be consumed from.
+   *
+   * @return The resource for the JMS Request-Reply Client.
+   */
+  def createForSqs[F[_]: Async: Logger](endpoint: HostBrokerEndpoint, credentials: UsernamePasswordCredentials, customClientId: Option[F[String]] = None)(replyQueue: String): Resource[F, JmsRRClient[F]] = {
+    val clientIdRes: Resource[F, String] = Resource.liftK[F](customClientId.getOrElse(RandomClientIdGen.randomClientId[F]))
+
+    val jmsClientRes: Resource[F, JmsClient[F]] = clientIdRes.flatMap { clientId =>
+      simpleQueueService.makeJmsClient[F](simpleQueueService.Config(
+              endpoint = simpleQueueService.Endpoint(Some(DirectAddress(HTTP,endpoint.host,Some(endpoint.port))),"elasticmq"),
+              credentials = Some(Credentials(credentials.username, credentials.password)),
+              clientId = simpleQueueService.ClientId(clientId),
               None
         ))
       }
@@ -146,5 +173,5 @@ private object RandomClientIdGen {
 
 sealed trait BrokerEndpoint
 case class HostBrokerEndpoint(host: String, port: Int) extends BrokerEndpoint
-sealed trait Credentials
-case class UsernamePasswordCredentials(username: String, password: String) extends Credentials
+sealed trait RRCredentials
+case class UsernamePasswordCredentials(username: String, password: String) extends RRCredentials

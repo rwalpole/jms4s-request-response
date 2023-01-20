@@ -21,15 +21,15 @@ object ClientExampleApp {
     val logging = Slf4jFactory[IO]
     implicit val logger = logging.getLogger
 
-    //val requestQueue = "request_general"
-    val requestQueue = "DEV_QUEUE_1"
-    //val replyQueue = "omega_editorial_web_application_instance_1"
-    val replyQueue = "DEV_QUEUE_2"
+    val requestQueue = "request-general"
+    //val requestQueue = "DEV_QUEUE_1"
+    val replyQueue = "omega-editorial-web-application-instance-1"
+    //val replyQueue = "DEV_QUEUE_2"
 
     // 1) create a Jms Request-Reply Client (e.g. from the Play Application start up method)
-    val clientRes: Resource[IO, JmsRRClient[IO]] = JmsRRClient.createForActiveMq[IO](
-      HostBrokerEndpoint("localhost", 61616),
-      UsernamePasswordCredentials("admin", "passw0rd"),
+    val clientRes: Resource[IO, JmsRRClient[IO]] = JmsRRClient.createForSqs[IO](
+      HostBrokerEndpoint("localhost", 9324),
+      UsernamePasswordCredentials("x", "x"),
       None
     )(replyQueue)
 
@@ -51,5 +51,6 @@ object ClientExampleApp {
 
     // 3) finally run the closer (e.g. from the Play Application shutdown method)
     closer.unsafeRunSync()
+
   }
 }

@@ -29,11 +29,11 @@ object EchoServer extends IOApp {
   private implicit val logger: SelfAwareStructuredLogger[IO] = logging.getLogger
 
   private val clientId = "echo_server_1"
-  //private val requestQueue = QueueName("request_general")
-  private val requestQueue = QueueName("DEV_QUEUE_1")
+  private val requestQueue = QueueName("request-general")
+  //private val requestQueue = QueueName("DEV_QUEUE_1")
 
-  //private val responseQueue = QueueName("omega_editorial_web_application_instance_1")  //TODO(AR) note this is for the editorial web application
-  private val responseQueue = QueueName("DEV_QUEUE_2")
+  private val replyQueue = QueueName("omega-editorial-web-application-instance-1")  //TODO(AR) note this is for the editorial web application
+  //private val responseQueue = QueueName("DEV_QUEUE_2")
   private val consumerConcurrencyLevel = 10
 
   val jmsClient: Resource[IO, JmsClient[IO]] = simpleQueueService.makeJmsClient[IO](
@@ -68,7 +68,7 @@ object EchoServer extends IOApp {
 
         _ <- IO.println(s"Echo Server sending response message: $responseText with correlationId: $requestMessageId")
 
-      } yield AckAction.send(responseMessage, responseQueue)
+      } yield AckAction.send(responseMessage, replyQueue)
     }).as(ExitCode.Success)
   }
 
