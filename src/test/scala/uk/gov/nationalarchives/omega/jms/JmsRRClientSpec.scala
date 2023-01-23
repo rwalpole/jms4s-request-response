@@ -29,13 +29,17 @@ class JmsRRClientSpec extends CatsEffectSuite {
       None
     )(replyQueue)
 
-    clientRes.allocated.map(client => {
-      val replyHandler1: ReplyMessageHandler[IO] = replyMessage => IO(assertEquals(replyMessage.body,"hello2123"))
-      client.request(requestQueue, RequestMessage("hello 1234"), replyHandler1)
+    val replyHandler1: ReplyMessageHandler[IO] = replyMessage => {
+      assertEquals(replyMessage.body,"hello2123")
+      IO(())
+    }
+
+    val result = clientRes.allocated.map(client => {
+      client._1.request(requestQueue, RequestMessage("hello 1234"), replyHandler1)
     })
     //IO.sleep(10.seconds)
     //  .unsafeRunSync()
-
+    result.flatten
     //
     //val exitCode = echoServer.unsafeToFuture()
     //closer.unsafeRunSync()
